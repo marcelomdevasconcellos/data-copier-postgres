@@ -7,96 +7,121 @@ from functions import *
 env = environ.Env()
 environ.Env.read_env()
 
-DATABASE_SOURCE = env.db('DATABASE_SOURCE')
-DATABASE = env.db('DATABASE')
-# TABLE_SOURCE
-# TABLE_TARGET
 
-table_list = read_csv('table_list.csv')
+SOURCE_DATABASE = env.db('SOURCE_DATABASE')
+TARGET_DATABASE = env.db('TARGET_DATABASE')
 
-for t in table_list:
-    print(t)
+TABLES = read_csv('table_list.csv')
 
-# for t in TABLES:
 
-#     print(t)
+VAR = """
 
-#     DATA_TYPE, column_names = execute_sql("""
-#         SELECT CASE
-#                WHEN data_type IN (
-#                     'character varying',
-#                     'text')
-#                THEN True
-#                ELSE False END AS is_text
-#           FROM information_schema.columns
-#          WHERE table_schema = 'public'
-#            AND table_name = '%s'
-#            AND column_name NOT IN (
-#                 'id',
-#                 'created_by_id',
-#                 'updated_by_id',
-#                 'created_at',
-#                 'updated_at')
-#            ORDER BY table_name, ordinal_position;""" % t, True, DATABASE)
-           
-#     DATA_TYPE = process_columns(DATA_TYPE)
+table = '%(schema)s.%(table)s'
+select = "%(select)s"
+fields = "id, %(fields)s"
+insert = "%(insert)s"
+update = "%(update)s"
 
-#     COLUMNS_TABLE, column_names = execute_sql("""
-#         SELECT column_name
-#           FROM information_schema.columns
-#          WHERE table_schema = 'public'
-#            AND table_name ILIKE '%s'
-#            AND column_name NOT IN (
-#                 'id',
-#                 'created_by_id',
-#                 'updated_by_id',
-#                 'created_at',
-#                 'updated_at')
-#          ORDER BY table_name, ordinal_position;""" % t, True, DATABASE)
+execute(table, select, fields, insert, update)
+
+print()
+"""
+
+content = """import environ
+from functions import execute
+
+
+env = environ.Env()
+environ.Env.read_env()
+
+SOURCE_DATABASE = env.db('SOURCE_DATABASE')
+TARGET_DATABASE = env.db('TARGET_DATABASE')
+
+
+"""
+
+for t in TABLES:
+
+    if '.' in t[0]:
+        a = t[0].split('.')
+        SOURCE_SCHEMA = a[0]
+        SOURCE_TABLE = a[1]
+    else:
+        SOURCE_SCHEMA = 'public'
+        SOURCE_TABLE = t[0]
+
+    if '.' in t[1]:
+        a = t[1].split('.')
+        TARGET_SCHEMA = a[0]
+        TARGET_TABLE = a[1]
+    else:
+        TARGET_SCHEMA = 'public'
+        TARGET_TABLE = t[1]
+
+    DATA_TYPE, TARGET_COLUMNS_NAMES = execute_sql("""
+        SELECT CASE
+               WHEN data_type IN (
+                    'boolean',
+                    'integer')
+               THEN False
+               ELSE True END AS is_text
+          FROM information_schema.columns
+         WHERE table_schema = '%s'
+           AND table_name = '%s'
+           AND column_name NOT IN (
+               'id', 'created_by_id', 'updated_by_id',
+               'created_at', 'updated_at')
+         ORDER BY table_name, column_name;""" % (
+               TARGET_SCHEMA, TARGET_TABLE), 
+            True, TARGET_DATABASE)
+
+    DATA_TYPE = process_columns(DATA_TYPE)
+
+    SOURCE_COLUMNS_TABLE, SOURCE_COLUMNS_NAMES = execute_sql("""
+        SELECT column_name
+          FROM information_schema.columns
+         WHERE table_schema = '%s'
+           AND table_name ILIKE '%s'
+           AND column_name NOT IN (
+               'id', 'foto', 'created_by_id', 'updated_by_id',
+               'created_at', 'updated_at')
+         ORDER BY table_name, column_name;""" % (
+             SOURCE_SCHEMA, SOURCE_TABLE), 
+            True, SOURCE_DATABASE)  
+
+    TARGET_COLUMNS_TABLE, TARGET_COLUMNS_NAMES = execute_sql("""
+        SELECT column_name
+          FROM information_schema.columns
+         WHERE table_schema = '%s'
+           AND table_name ILIKE '%s'
+           AND column_name NOT IN (
+               'id', 'created_by_id', 'updated_by_id',
+               'created_at', 'updated_at')
+         ORDER BY table_name, column_name;""" % (
+             TARGET_SCHEMA, TARGET_TABLE), 
+            True, TARGET_DATABASE)
     
-#     COLUMNS = process_columns(COLUMNS_TABLE)
-#     SELECT = create_select(t, COLUMNS, COLUMNS)
-#     INSERT = create_insert(t, COLUMNS, DATA_TYPE)
-#     UPDATE = create_update(t, COLUMNS, DATA_TYPE)
+    SOURCE_COLUMNS = process_columns(SOURCE_COLUMNS_TABLE)
+    TARGET_COLUMNS = process_columns(TARGET_COLUMNS_TABLE)
 
-#     print()
-#     print()
-#     print("Processing table %s" % t)
+    SELECT = create_select(
+        SOURCE_SCHEMA, SOURCE_TABLE, SOURCE_COLUMNS)
 
-#     ID_EXISTS, column_names = execute_sql("""
-#         SELECT id
-#           FROM public.%s;""" % t, True, DATABASE)
-    
-#     ID_EXISTS = process_columns(ID_EXISTS)
+    INSERT = create_insert(
+        TARGET_SCHEMA, TARGET_TABLE, TARGET_COLUMNS, DATA_TYPE)
 
-#     lista, column_names = execute_sql(SELECT, True, DATABASE_SOURCE)
+    UPDATE = create_update(
+        TARGET_SCHEMA, TARGET_TABLE, TARGET_COLUMNS, DATA_TYPE)
 
-#     print('Count lines %s: %s' % (t, len(lista)))
+    dados = {}
+    dados['schema'] = TARGET_SCHEMA
+    dados['table'] = TARGET_TABLE
+    dados['select'] = SELECT
+    dados['fields'] = ', '.join(TARGET_COLUMNS)
+    dados['insert'] = INSERT
+    dados['update'] = UPDATE
 
-#     TEXT = ''
-#     last = 'TABLE %s IS EMPTY' % t
+    content += VAR % dados
+    print("Processing table %s" % TARGET_TABLE)
 
-#     for l in lista:
-
-#         dic = {}
-
-#         for a in range(len(column_names)):
-#             dic[column_names[a]] = str(l[a]).replace("'", "''")
-
-#         dic['table'] = t
-
-#         if int(dic['id']) in ID_EXISTS:
-
-#             TEXT += UPDATE % dic
-#             last = 'UPDATE %(table)s %(id)s' % dic
-
-#         else:
-
-#             TEXT += INSERT % dic
-#             last = 'INSERT %(table)s %(id)s' % dic
-
-#     execute_sql(
-#         TEXT,
-#         False, DATABASE)
-
-#     print(last)
+save_file('process_etl.py', content)

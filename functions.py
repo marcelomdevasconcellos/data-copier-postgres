@@ -1,12 +1,31 @@
 import os
 import psycopg2
 import datetime
-import pandas as pd
+import environ
+
+env = environ.Env()
+environ.Env.read_env()
+
+SOURCE_DATABASE = env.db('SOURCE_DATABASE')
+TARGET_DATABASE = env.db('TARGET_DATABASE')
 
 
 def read_csv(filename):
-    import pandas as pd
-    return pd.read_csv(filename)
+    import csv
+    with open(filename) as csv_file:
+        csv_reader = csv.reader(
+            csv_file, delimiter=',')
+        line_count = 0
+        lista = []
+        for row in csv_reader:
+            if line_count == 0:
+                print(f'Column names are {", ".join(row)}')
+                line_count += 1
+            else:
+                lista.append([row[0], row[1]])
+                line_count += 1
+        print(f'Processed {line_count} lines.')
+    return lista
 
 
 def execute_sql(select, array, database):
@@ -17,7 +36,7 @@ def execute_sql(select, array, database):
         print("I am unable to connect to the database")
     if select:
         cur = conn.cursor()
-        select = select.replace("None", 'Null') #.replace("'Null'", 'Null')
+        select = select.replace("None", 'Null').replace("'Null'", 'Null')
         cur.execute(select)
         column_names = []
         if array:
@@ -30,6 +49,36 @@ def execute_sql(select, array, database):
     else:
         return None, None
 
+
+def execute(table, select, fields, insert, update):
+    print()
+    print('ETL %s' % table)
+    fields = fields.replace(" ", "").split(',')
+
+    
+    exists_command, _ = execute_sql('SELECT id FROM %s;' % table, True, TARGET_DATABASE)
+    exists = []
+    for e in exists_command: 
+        exists.append(e[0])
+    data, _ = execute_sql(select, True, SOURCE_DATABASE)
+    command = ''
+    last = ''
+    for a in data:
+        dicion = {}
+        for n in range(len(fields)):
+            dicion[fields[n]] = str(a[n]).replace("'", "''")
+        if int(dicion['id']) in exists:
+            command += str(update % dicion).replace("='',", "=NULL,")
+            #print('U')
+            #execute_sql(command, False, TARGET_DATABASE)
+            last = 'UPDATE %(id)s' % dicion
+        else:
+            command += str(insert % dicion).replace(", '',", ", NULL,")
+            #print('I')
+            #execute_sql(command, False, TARGET_DATABASE)
+            last = 'INSERT %(id)s' % dicion
+    print(last)
+    execute_sql(command, False, TARGET_DATABASE)
 
 
 def save_file(file, content):
@@ -68,20 +117,18 @@ def process_columns(list_old):
     return list_new
 
 
-def create_select(table_name, columns_new, columns_old):
+def create_select(schema_name, table_name, columns_new):
     data_types = []
     n = range(len(columns_new))
     for a in n:
-        data_types.append(""+columns_old[a]+" AS "+columns_new[a]+"")
-    return """
-    SELECT id, 
-           %s
-     FROM public.%s
-    ORDER BY id;
-        """ % (', '.join(data_types), table_name)
+        data_types.append(columns_new[a])
+    return """SELECT id, %s FROM %s.%s ORDER BY id; """ % (
+               ', '.join(data_types), 
+               schema_name, 
+               table_name)
 
 
-def create_insert(table_name, columns, data_type):
+def create_insert(schema_name, table_name, columns, data_type):
     data_types = []
     n = range(len(columns))
     for a in n:
@@ -89,18 +136,11 @@ def create_insert(table_name, columns, data_type):
             data_types.append("'#(%s)s'" % columns[a])
         else:
             data_types.append("#(%s)s" % columns[a])
-    INSERT = """
-        INSERT INTO public.%s (id, 
-               %s, 
-               created_at, created_by_id) 
-        VALUES ( #(id)s, 
-               %s, 
-               NOW(), NULL);
-    """ % (table_name, ', '.join(columns), ', '.join(data_types))
+    INSERT = """INSERT INTO %s.%s (id, %s, created_at, created_by_id) VALUES ( #(id)s, %s, NOW(), NULL);""" % (schema_name, table_name, ', '.join(columns), ', '.join(data_types))
     return INSERT.replace('#', '%')
 
 
-def create_update(table_name, columns, data_type):
+def create_update(schema_name, table_name, columns, data_type):
     data_types = []
     n = range(len(columns))
     for a in n:
@@ -108,9 +148,6 @@ def create_update(table_name, columns, data_type):
             data_types.append(""+columns[a]+"='%("+columns[a]+")s'")
         else:
             data_types.append(""+columns[a]+"=%("+columns[a]+")s")
-    UPDATE = """
-        UPDATE public.%s 
-           SET %s
-         WHERE id=#(id)s;
-    """ % (table_name, ', '.join(data_types))
+    UPDATE = """UPDATE %s.%s SET %s WHERE id=#(id)s;""" % (
+        schema_name, table_name, ', '.join(data_types))
     return UPDATE.replace('#', '%')
