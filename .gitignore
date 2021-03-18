@@ -130,3 +130,6 @@ dmypy.json
 
 # MAC File
 .DS_Store
+
+# etl command
+etl.py

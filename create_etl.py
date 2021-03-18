@@ -27,18 +27,19 @@ execute(table, select, fields, insert, update)
 print()
 """
 
-content = """import environ
-from functions import execute
+
+dados = {}
+dados['source_database'] = SOURCE_DATABASE
+dados['target_database'] = TARGET_DATABASE
 
 
-env = environ.Env()
-environ.Env.read_env()
+content = """from functions import execute
 
-SOURCE_DATABASE = env.db('SOURCE_DATABASE')
-TARGET_DATABASE = env.db('TARGET_DATABASE')
+SOURCE_DATABASE = '%(source_database)s'
+TARGET_DATABASE = '%(target_database)s'
 
+""" % dados
 
-"""
 
 for t in TABLES:
 
@@ -113,7 +114,6 @@ for t in TABLES:
     UPDATE = create_update(
         TARGET_SCHEMA, TARGET_TABLE, TARGET_COLUMNS, DATA_TYPE)
 
-    dados = {}
     dados['schema'] = TARGET_SCHEMA
     dados['table'] = TARGET_TABLE
     dados['select'] = SELECT
@@ -121,7 +121,10 @@ for t in TABLES:
     dados['insert'] = INSERT
     dados['update'] = UPDATE
 
+    dados['source_database'] = SOURCE_DATABASE
+    dados['target_database'] = TARGET_DATABASE
+
     content += VAR % dados
     print("Processing table %s" % TARGET_TABLE)
 
-save_file('process_etl.py', content)
+save_file('etl.py', content)
