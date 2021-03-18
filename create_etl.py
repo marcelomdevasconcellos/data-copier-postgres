@@ -119,9 +119,6 @@ for t in TABLES:
     dados['insert'] = INSERT
     dados['update'] = UPDATE
 
-    dados['source_database'] = SOURCE_DATABASE
-    dados['target_database'] = TARGET_DATABASE
-
     content += VAR % dados
     print("Processing table %s" % TARGET_TABLE)
 
