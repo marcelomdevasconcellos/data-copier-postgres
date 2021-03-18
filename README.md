@@ -19,63 +19,41 @@ DATABASE=psql://user:pass@host:port/name
 pip install -r requirements.txt
 ```
 
-3) Edit `plan.ods` with tables_old and tables_new list
+3) Edit `table_list.csv` with tables_old and tables_new list
 
 
-4) Execute `create_commands.py` for read `plan.ods` and create all commands: 
-
-```
-python copy.py
-```
-
-5) Execute `copy.py` for transfer data between two database: 
+4) Execute `create_etl.py` for read `table_list.csv` and create all commands: 
 
 ```
-python copy.py
+python create_etl.py
 ```
 
-## Data structure example:
+5) Execute `etl.py` for transfer data between two database: 
 
 ```
+python etl.py
+```
 
-LIST = [ 
-    {
-        'origem': {
-            'table': nome_tabela, 
-            'campos': [lista_campos, ]},
-        'destino': {
-            'table': nome_tabela, 
-            'campos': [lista_campos, ]},
-    },
-    {
-        'origem': {
-            'table': nome_tabela, 
-            'campos': [lista_campos, ]},
-        'destino': {
-            'table': nome_tabela, 
-            'campos': [lista_campos, ]},
-    },
-    (...)
-    {
-        'origem': {
-            'table': nome_tabela, 
-            'campos': [lista_campos, ]},
-        'destino': {
-            'table': nome_tabela, 
-            'campos': [lista_campos, ]},
-    },
-]
+## Table list example:
 
+```
+source_tables,target_tables
+xxxx.vinculo_tipos,xxxx_vinculotipos
+xxxx.processo_tipos,xxxx_processotipos
+xxxx.desligamento_motivos,xxxx_desligamentomotivos
+xxxx.escopos,xxxx_escopos
+xxxx.instituicao_tipos,xxxx_instituicaotipos
+xxxx.instituicao_definicoes,xxxx_instituicaodefinicoes
+xxxx.vinculos,xxxx_vinculos
+xxxx.processos,xxxx_processos
 ``` 
 
 ## Get database list
 
 ```
-
 SELECT DISTINCT table_name
   FROM information_schema.columns
  WHERE table_schema = 'public'
- ORDER BY table_name
-
+ ORDER BY table_name;
 ```
 
