@@ -27,11 +27,9 @@ execute(table, select, fields, insert, update)
 print()
 """
 
-
 dados = {}
 dados['source_database'] = SOURCE_DATABASE
 dados['target_database'] = TARGET_DATABASE
-
 
 content = """from functions import execute
 
