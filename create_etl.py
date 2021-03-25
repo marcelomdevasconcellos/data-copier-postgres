@@ -33,8 +33,8 @@ dados['target_database'] = TARGET_DATABASE
 
 content = """from functions import execute
 
-SOURCE_DATABASE = '%(source_database)s'
-TARGET_DATABASE = '%(target_database)s'
+SOURCE_DATABASE = %(source_database)s
+TARGET_DATABASE = %(target_database)s
 
 """ % dados
 
